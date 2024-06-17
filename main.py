@@ -24,7 +24,6 @@ conn.commit()
 cur.close()
 conn.close()
 
-
 task_id = 0
 
 task_4 = [
