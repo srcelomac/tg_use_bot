@@ -12,15 +12,15 @@ import random
 import requests
 import json
 import string
-import sqlite3
-import math
+import threading
+from aiogram.enums import ParseMode
 
 router = Router()
 step = 0
 answer_true = 0
 answer_false = 0
 task_id = 0
-flag_trainig = False
+#flag_trainig = False
 
 def diff_letters(a, b):
     return sum(a[i] != b[i] for i in range(min(len(a), len(b))))
@@ -316,10 +316,10 @@ async def update_stats_wrongs(chat_id):
     cur.close()
     conn.close()
 
-list_of_words = []
-list_of_answers = []
-async def get_task(chat_id):
-    global list_of_words
+#list_of_words = []
+#list_of_answers = []
+async def get_task(chat_id, task_id):
+    #global list_of_words
     conn = sqlite3.connect('tasks.db')
     cur = conn.cursor()
     sqlite_select_query = f"""SELECT * from Tasks where user_id = {chat_id}"""
@@ -329,9 +329,47 @@ async def get_task(chat_id):
     cur.close()
     conn.close()
 
-async def get_task_training(chat_id):
-    global list_of_words
-    global list_of_answers
+async def get_task_words(chat_id, task_id):
+    conn = sqlite3.connect('training.db')
+    cur = conn.cursor()
+
+    sqlite_select_query = f"""SELECT rights from Training where user_id = {chat_id}"""
+    cur.execute(sqlite_select_query)
+    rights = cur.fetchall()
+
+    sqlite_select_query = f"""SELECT wrongs from Training where user_id = {chat_id}"""
+    cur.execute(sqlite_select_query)
+    wrongs = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    v = []
+    for i in range(len(rights)):
+        s1 = str(rights[i])
+        s2 = str(wrongs[i])
+        s1 = s1.replace('(', '')
+        s1 = s1.replace(')', '')
+        s1 = s1.replace("'", '')
+        s2 = s2.replace('(', '')
+        s2 = s2.replace(')', '')
+        s2 = s2.replace("'", '')
+
+        if (task_id != 4):
+            s1 = s1.replace(',', '')
+            s2 = s2.replace(',', '')
+        else:
+            if (s1[-1] == ','):
+                s1 = s1[:-1:]
+            if (s2[-1] == ','):
+                s2 = s2[:-1:]
+        v.append([s2, s1])
+
+    return v
+
+async def get_task_training(chat_id, task_id):
+    #global list_of_words
+    #global list_of_answers
     conn = sqlite3.connect('tasks.db')
     cur = conn.cursor()
     # print(task_id)
@@ -346,7 +384,7 @@ async def get_task_training(chat_id):
     conn.close()
 
 
-async def add_task(chat_id, a, b):
+async def add_task(chat_id, task_id, a, b):
     conn = sqlite3.connect('tasks.db')
     cur = conn.cursor()
     cur.execute('INSERT INTO Tasks (user_id, task_id, words, answers) VALUES (?, ?, ?, ?)',
@@ -359,41 +397,122 @@ task_words = []
 
 @router.message(Main_menu.exercise)
 async def start_training(message: Message, state: FSMContext):
-    global task_id
-    global step
-    global flag_trainig
-    global list_of_words
-    global list_of_answers
+    data = await state.get_data()
+    chat_id = int(data['key'])
+    task_id = int(data['task_id'])
+    step = int(data['step'])
+    #flag_trainig = bool(data['flag_training'])
+    answer_true = int(data['answer_true'])
+    answer_false = int(data['answer_false'])
+    '''
+    conn = sqlite3.connect('variables.db')
+    cur = conn.cursor()
+
+    sqlite_select_query = f"""SELECT step from Variables where (user_id = {chat_id})"""
+    cur.execute(sqlite_select_query)
+    step = int(cur.fetchall()[0])
+
+    sqlite_select_query = f"""SELECT flag_trainig from Variables where (user_id = {chat_id})"""
+    cur.execute(sqlite_select_query)
+    flag_trainig = bool(cur.fetchall()[0])
+
+    cur.close()
+    conn.close()
+    '''
+
+
+    #global task_id         +
+    #global step            +
+    #global flag_trainig    +
+    #global list_of_words   +
+    #global list_of_answers +
     if (step == 0):
         if (message.text.isdigit()):
-            await state.update_data(task=message.text)
+            await state.update_data(task_id=message.text)
+            await state.update_data(flag_training=True)
+
             data = await state.get_data()
-            task_id = int(data['task'])
-            flag_trainig = True
+            task_id = int(data['task_id'])
+            chat_id = int(data['key'])
+
+            conn = sqlite3.connect('tasks.db')
+            cur = conn.cursor()
+
+            sqlite_select_query = f"""SELECT answers from Tasks where (user_id = {int((await state.get_data())['key'])} and task_id = {(await state.get_data())['task_id']})"""
+            cur.execute(sqlite_select_query)
+            list_of_answers = cur.fetchall()
+
+            sqlite_select_query = f"""SELECT words from Tasks where (user_id = {int((await state.get_data())['key'])} and task_id = {(await state.get_data())['task_id']})"""
+            cur.execute(sqlite_select_query)
+            list_of_words = cur.fetchall()
+
+            cur.close()
+            conn.close()
+
+            '''
+            conn = sqlite3.connect('variables.db')
+            cur = conn.cursor()
+            sqlite_select_query = f"""UPDATE Variables SET flag_training = True where user_id = {chat_id}"""
+            cur.execute(sqlite_select_query)
+            conn.commit()
+            cur.close()
+            conn.close()
+            '''
+            #flag_trainig = True  +
         else:
             await message.answer(
                 f'Укажи номер задания',
             )
-    if (flag_trainig == True or step != 0):
+    #print((await state.get_data())['flag_training'])
+    if ((await state.get_data())['flag_training'] == True or step != 0):
         try:
-            global answer_true
-            global answer_false
-            global task_words
+            #global answer_true   +
+            #global answer_false  +
+            #global task_words
+            task_words = list(await get_task_words(int((await state.get_data())['key']), int((await state.get_data())['task_id'])))
+            #print(type(task_words))
+
+            '''
+            conn = sqlite3.connect('training.db')
+            cur = conn.cursor()
+
+            sqlite_select_query = f"""SELECT answers from Training where (user_id = {chat_id})"""
+            cur.execute(sqlite_select_query)
+            task_words = cur.fetchall()
+
+            cur.close()
+            conn.close()
+            '''
+
             if (step == 0):
                 if (message.text.lower() == "стоп" or message.text.strip() == "Стоп"):
-                    # main_menu(message)
-                    # print("Выход")
-                    # bot.register_next_step_handler(message, main_menu)
-                    step = 0
-                    task_id = 0
-                    task_words = []
+
+                    await state.update_data(step=0)
+                    await state.update_data(task_id=0)
+
+                    conn = sqlite3.connect('training.db')
+                    cur = conn.cursor()
+
+                    sqlite_select_query = f"""DELETE from Training where (user_id = {int((await state.get_data())['key'])})"""
+                    cur.execute(sqlite_select_query)
+
+                    conn.commit()
+                    cur.close()
+                    conn.close()
+
+                    # step = 0         +
+                    # task_id = 0      +
+                    # task_words = []  +
                     markup = keyboard.start_kb
                     await message.answer(
-                        f'Ты сделал верно {answer_true} из {answer_true + answer_false} заданий. Что-то ещё?',
+                        f'Ты сделал верно {int((await state.get_data())['answer_true'])} из {int((await state.get_data())['answer_true']) + int((await state.get_data())['answer_false'])} заданий. Что-то ещё?',
                         reply_markup=markup)
-                    answer_true = 0
-                    answer_false = 0
-                    flag_trainig = False
+                    await state.update_data(answer_true=0)
+                    await state.update_data(answer_false=0)
+                    await state.update_data(flag_trainig=False)
+                    # answer_true = 0      +
+                    # answer_false = 0     +
+                    # flag_trainig = False +
                     await state.set_state(Main_menu.mode)
                 else:
                     '''
@@ -410,63 +529,136 @@ async def start_training(message: Message, state: FSMContext):
                     cur.close()
                     conn.close()
                     '''
-                    if (task_id == 4):
+                    #lock = threading.Lock()
+                    if (int((await state.get_data())['task_id']) == 4):
                         task_words = task_4
                     else:
-                        await get_task_training(message.chat.id)
+                        #await get_task_training(message.chat.id)
+                        conn = sqlite3.connect('tasks.db')
+                        cur = conn.cursor()
+                        # print(task_id)
+                        sqlite_select_query = f"""SELECT words from Tasks where (user_id = {(await state.get_data())['key']} and task_id = {(await state.get_data())['task_id']})"""
+                        cur.execute(sqlite_select_query)
+                        # cur.execute(f"SELECT words * FROM Tasks * WHERE user_id = {message.chat.id}")
+                        list_of_words = cur.fetchall()
+                        sqlite_select_query = f"""SELECT answers from Tasks where (user_id = {(await state.get_data())['key']} and task_id = {(await state.get_data())['task_id']})"""
+                        cur.execute(sqlite_select_query)
+                        list_of_answers = cur.fetchall()
+                        cur.close()
+                        conn.close()
                         for i in range(len(list_of_words)):
                             s1 = str(list_of_words[i])
                             s1 = s1.replace('(', '')
                             s1 = s1.replace(')', '')
                             s1 = s1.replace("'", '')
-                            s1 = s1.replace(',', '')
                             s2 = str(list_of_answers[i])
                             s2 = s2.replace('(', '')
                             s2 = s2.replace(')', '')
                             s2 = s2.replace("'", '')
-                            s2 = s2.replace(',', '')
+                            if (int((await state.get_data())['task_id']) != 4):
+                                s1 = s1.replace(',', '')
+                                s2 = s2.replace(',', '')
+                            else:
+                                if (s1[-1] == ','):
+                                    s1 = s1[:-1:]
+                                if (s2[-1] == ','):
+                                    s2 = s2[:-1:]
                             task_words.append([s1, s2])
+                        task_words = task_words + tasks_new_common[int((await state.get_data())['task_id']) - 9]
+                            #(type(task_words))
                             # print(s1)
                             # print(s2)
                         # print(task_words)
-                    task_words = task_words + tasks_new_common[task_id - 9]
                     random.shuffle(task_words)
+                    #print(type(task_words))
+
+                    conn = sqlite3.connect('training.db')
+                    cur = conn.cursor()
+
+                    sqlite_select_query = f"""DELETE from Training where (user_id = {(await state.get_data())['key']})"""
+                    cur.execute(sqlite_select_query)
+
+                    conn.commit()
+                    cur.close()
+                    conn.close()
+
+                    conn = sqlite3.connect('training.db')
+                    cur = conn.cursor()
+                    for x, y in task_words:
+                        cur.execute('INSERT INTO Training (user_id, rights, wrongs) VALUES (?, ?, ?)',
+                                    (int((await state.get_data())['key']), str(y), str(x)))
+                    conn.commit()
+                    cur.close()
+                    conn.close()
+
                     markup = keyboard.stop_kb
                     if (len(task_words) == 0):
                         await message.answer("Список пуст")
-                        step = 0
-                        task_id = 0
+                        await state.update_data(step=0)
+                        await state.update_data(task_id=0)
+                        #step = 0     +
+                        #task_id = 0  +
                         markup = keyboard.start_kb
                         await message.answer("Что-то ещё?",
                                              reply_markup=markup)
                         await state.set_state(Main_menu.mode)
                     else:
-                        await message.answer("Напиши букву, которая должна стоять на месте пропуска\nПр_рогатива -> е")
+                        if (int((await state.get_data())['task_id']) == 4):
+                            await message.answer(
+                                "Напиши слово целиком, выделив заглавной буквой гласную, на которую падает ударение\nЩавель -> <u>Щ</u>авЕль или <u>щ</u>авЕль", parse_mode=ParseMode.HTML)
+                        else:
+                            await message.answer("Напиши букву, которая должна стоять на месте пропуска\nПр_рогатива -> е")
                         await message.answer(task_words[step][0], reply_markup=markup)
-                        step += 1
+                        data = await state.get_data()
+                        curv = data['step']
+                        await state.update_data(step=curv+1)
+                        #step += 1
                         await state.set_state(Main_menu.exercise)
+                    #lock.release()
             elif (step > 0):
+                #print(type(task_words))
+                #print(task_words)
+                #print(type(message.text.strip()))
                 if (message.text.lower() == "стоп" or message.text.strip() == "Стоп"):
-                    # main_menu(message)
-                    # print("Выход")
-                    # bot.register_next_step_handler(message, main_menu)
-                    step = 0
-                    task_id = 0
-                    task_words = []
+                    await state.update_data(step=0)
+                    await state.update_data(task_id=0)
+
+                    conn = sqlite3.connect('training.db')
+                    cur = conn.cursor()
+
+                    sqlite_select_query = f"""DELETE from Training where (user_id = {(await state.get_data())['key']})"""
+                    cur.execute(sqlite_select_query)
+
+                    conn.commit()
+                    cur.close()
+                    conn.close()
+
+                    #step = 0         +
+                    #task_id = 0      +
+                    #task_words = []  +
                     markup = keyboard.start_kb
                     await message.answer(
-                        f'Ты сделал верно {answer_true} из {answer_true + answer_false} заданий. Что-то ещё?',
+                        f'Ты сделал верно {int((await state.get_data())['answer_true'])} из {int((await state.get_data())['answer_true']) + int((await state.get_data())['answer_false'])} заданий. Что-то ещё?',
                         reply_markup=markup)
-                    answer_true = 0
-                    answer_false = 0
-                    flag_trainig = False
+
+                    await state.update_data(answer_true=0)
+                    await state.update_data(answer_false=0)
+                    await state.update_data(flag_training=False)
+                    #answer_true = 0       +
+                    #answer_false = 0      +
+                    #flag_trainig = False  +
                     await state.set_state(Main_menu.mode)
-                elif (message.text.strip().lower() == task_words[step - 1][1].lower()):
+                elif ((int((await state.get_data())['task_id']) != 4) and (message.text.strip().lower() == (str(task_words[step - 1][1])).lower())) or ((int((await state.get_data())['task_id']) == 4) and (message.text.strip()[1::] == (task_words[step-1][1][1::]).strip())):
                     # print(message.text.strip().lower())
                     # print(task_words[step - 1][1].lower())
                     # print("-----------------")
                     await message.answer("Верно!")
-                    answer_true += 1
+                    #lock = threading.Lock()
+                    data = await state.get_data()
+                    curv = data['answer_true']
+                    await state.update_data(answer_true=curv + 1)
+                    #answer_true += 1  +
+                    #lock.release()
                     '''
                     conn = sqlite3.connect('stats.db')
                     cur = conn.cursor()
@@ -478,20 +670,37 @@ async def start_training(message: Message, state: FSMContext):
                     '''
                     await update_stats_rights(message.chat.id)
                     if (step >= len(task_words)):
-                        step = 0
+                        await state.update_data(step=0)
+                        #step = 0  +
                         markup = keyboard.start_kb
                         await message.answer(
-                            f'Слова закончились. Ты молодец!\n Ты сделал верно {answer_true} из {answer_true + answer_false} заданий.',
+                            f'Слова закончились. Ты молодец!\n Ты сделал верно {int((await state.get_data())['answer_true'])} из {int((await state.get_data())['answer_true']) + int((await state.get_data())['answer_false'])} заданий.',
                             reply_markup=markup)
-                        answer_true = 0
-                        answer_false = 0
-                        flag_trainig = False
-                        task_words = []
+
+                        await state.update_data(answer_true=0)
+                        await state.update_data(answer_false=0)
+                        await state.update_data(flag_training=False)
+                        conn = sqlite3.connect('training.db')
+                        cur = conn.cursor()
+
+                        sqlite_select_query = f"""DELETE from Training where (user_id = {chat_id})"""
+                        cur.execute(sqlite_select_query)
+
+                        conn.commit()
+                        cur.close()
+                        conn.close()
+
+                        # answer_true = 0       +
+                        # answer_false = 0      +
+                        # flag_trainig = False  +
+                        # task_words = []       +
                         await state.set_state(Main_menu.mode)
                     else:
                         await message.answer(task_words[step][0])
-                        step += 1
-                        # print('yep')
+                        data = await state.get_data()
+                        curv = data['step']
+                        await state.update_data(step=curv + 1)
+                        #step += 1   +
                         await state.set_state(Main_menu.exercise)
                 else:
                     # answer = req_gptshka(task_4[step-1][1])
@@ -500,7 +709,12 @@ async def start_training(message: Message, state: FSMContext):
                     # print(message.text.strip()[1:-1:], task_words[step - 1][1][1:-1:])
                     await message.answer(
                         f'Неверно! \nПравильный ответ: {task_words[step - 1][1]}')
-                    answer_false += 1
+
+                    data = await state.get_data()
+                    curv = data['answer_false']
+                    await state.update_data(answer_false=curv + 1)
+
+                    #answer_false += 1   +
                     '''
                     conn = sqlite3.connect('stats.db')
                     cur = conn.cursor()
@@ -512,95 +726,141 @@ async def start_training(message: Message, state: FSMContext):
                     '''
                     await update_stats_wrongs(message.chat.id)
                     if (step >= len(task_words)):
-                        step = 0
+                        await state.update_data(step=0)
+                        #step = 0   +
                         markup = keyboard.start_kb
                         await message.answer(
-                            f'Слова закончились. Ты молодец!\nТы сделал верно {answer_true} из {answer_true + answer_false} заданий.',
+                            f'Слова закончились. Ты молодец!\nТы сделал верно {int((await state.get_data())['answer_true'])} из {int((await state.get_data())['answer_true']) +int((await state.get_data())['answer_false'])} заданий.',
                             reply_markup=markup)
-                        answer_true = 0
-                        answer_false = 0
-                        flag_trainig = False
-                        task_words = []
+
+                        await state.update_data(answer_true=0)
+                        await state.update_data(answer_false=0)
+                        await state.update_data(flag_training=False)
+                        conn = sqlite3.connect('training.db')
+                        cur = conn.cursor()
+
+                        sqlite_select_query = f"""DELETE from Training where (user_id = {chat_id})"""
+                        cur.execute(sqlite_select_query)
+
+                        conn.commit()
+                        cur.close()
+                        conn.close()
+
+                        #answer_true = 0        +
+                        #answer_false = 0       +
+                        #flag_trainig = False   +
+                        #task_words = []        +
                         await state.set_state(Main_menu.mode)
                     else:
                         await message.answer(task_words[step][0])
-                        step += 1
-                        # print("no")
+                        data = await state.get_data()
+                        curv = data['step']
+                        await state.update_data(step=curv + 1)
+                        #step += 1   +
                         await state.set_state(Main_menu.exercise)
         except Exception as Exp:
             print(Exp)
 
-flag_add = False
-word_was = False
+#flag_add = False
+#word_was = False
 
 
 @router.message(Main_menu.add)
 async def start_training(message: Message, state: FSMContext):
-    global task_id
-    global step
-    global flag_trainig
-    if (flag_trainig == False):
+    data = await state.get_data()
+    chat_id = int(data['key'])
+    step = int(data['step'])
+    task_id = int(data['task_id'])
+    #flag_trainig = bool(data['flag_training'])
+    flag_add = bool(data['flag_add'])
+    word_was = bool(data['word_was'])
+    #global task_id        +
+    #global step           +
+    #global flag_trainig   +
+    if ((await state.get_data())['flag_training'] == False):
         if (message.text.isdigit()):
-            await state.update_data(task=message.text)
-            data = await state.get_data()
-            task_id = int(data['task'])
-            flag_trainig = True
+            await state.update_data(task_id=message.text)
+            await state.update_data(flag_training=True)
+            #flag_trainig = True   +
         else:
             await message.answer(
                 f'Укажи номер задания',
             )
-    if (flag_trainig == True):
+    if ((await state.get_data())['flag_training'] == True):
         try:
-            global flag_add
-            global word_was
+            #global flag_add
+            #global word_was
             if (flag_add == False):
                 markup = keyboard.stop_kb
                 await message.answer( "На первой строке напиши слово с пропуском '_', на второй правильный ответ \nКогда решишь прекратить, выбери на клавиатуре или напиши слово Стоп", reply_markup=markup)
-                flag_add = True
+                await state.update_data(flag_add=True)
+                #flag_add = True   +
                 #bot.register_next_step_handler(message, add_task)
             else:
                 #print(message.text.split('\n'))
+                #lock = threading.Lock()
                 new_pair = [x.lower() for x in message.text.strip().split('\n')]
                 if (message.text.lower() == "стоп" or message.text.strip() == "Стоп"):
                     # main_menu(message)
                     # print("Выход")
                     # bot.register_next_step_handler(message, main_menu)
-                    flag_add = 0
-                    task_id = 0
-                    flag_trainig = False
+                    await state.update_data(flag_add=False)
+                    await state.update_data(flag_training=False)
+                    await state.update_data(task_id=0)
+                    #flag_add = 0           +
+                    #task_id = 0            +
+                    #flag_trainig = False   +
                     markup = keyboard.start_kb
                     await message.answer( "Хорошо!", reply_markup=markup)
                     await state.set_state(Main_menu.mode)
-                elif ((len(message.text.strip().split('\n')) == 2) and (diff_letters(new_pair[0], new_pair[1]) == 1)) or (task_id == 16 or task_id == 4):
-                    await get_task(message.chat.id)
-                    word_was = False
+                elif ((len(message.text.strip().split('\n')) == 2) and (diff_letters(new_pair[0], new_pair[1]) == 1)) or ((await state.get_data())['task_id'] == 16 or (await state.get_data())['task_id'] == 4):
+                    #await get_task(message.chat.id)
+                    await state.update_data(word_was=False)
+                    #word_was = False   +
+                    conn = sqlite3.connect('tasks.db')
+                    cur = conn.cursor()
+
+                    sqlite_select_query = f"""SELECT words from Tasks where (user_id = {chat_id} and task_id = {(await state.get_data())['task_id']})"""
+                    cur.execute(sqlite_select_query)
+                    list_of_words = cur.fetchall()
+
+                    cur.close()
+                    conn.close()
+
                     for _ in list_of_words:
                         #print(_)
                         if (new_pair[0] in _):
-                            word_was = True
+                            await state.update_data(word_was=True)
+                            #word_was = True   +
                             break
                     if (not(word_was)):
-                        await add_task(message.chat.id, new_pair[0], new_pair[1])
+                        await add_task(message.chat.id,(await state.get_data())['task_id'], new_pair[0], new_pair[1])
                         await message.answer("Добавлено!")
                         #bot.register_next_step_handler(message, add_task)
                     else:
                         await message.answer("Это слово уже добавлено")
-                        word_was = False
-                        #bot.register_next_step_handler(message, add_task)
+                        await state.update_data(word_was=False)
+                        #word_was = False   +
                 else:
                     await message.answer("Где-то ошибка, проверьте корректность")
-                    #bot.register_next_step_handler(message, add_task)
+                #lock.release()
         except Exception as exp:
             print("ERROR add_task", exp)
 
 @router.message(Main_menu.mode)
 async def start_mode(message: Message, state: FSMContext):
-    #print(message.text, type(message.text))
+    await state.update_data(key=message.chat.id)
     await state.update_data(mode=message.text)
+    await state.update_data(step=0)
+    await state.update_data(answer_true=0)
+    await state.update_data(answer_false=0)
+    await state.update_data(task_id=0)
+    await state.update_data(flag_training=False)
+    await state.update_data(flag_add=False)
+    await state.update_data(word_was=False)
+
     data = await state.get_data()
-    #print(data)
     if (data["mode"].lower() == 'моя статистика'):
-        data = await state.get_data()
         await state.clear()
         await state.set_state(Main_menu.mode)
         await stats(message)
@@ -629,9 +889,9 @@ async def start_mode(message: Message, state: FSMContext):
 #async def start_task(message: Message, state: FSMContext):
 #    global task_id
 #    if (message.text.isdigit()):
-#        await state.update_data(task=message.text)
+#        await state.update_data(task_id=message.text)
 #        data = await state.get_data()
-#        task_id = data['task']
+#        task_id = data['task_id']
 #        print("task-id", task_id)
 #        await state.clear()
 #        await state.set_state(Main_menu.exercise)
@@ -643,7 +903,8 @@ async def start_mode(message: Message, state: FSMContext):
 @router.message()
 async def start(message: Message, state: FSMContext):
     await state.clear()
-    task_id = 0
+    await state.update_data(task_id=0)
+    #task_id = 0   +
     if (message.text == '/start'):
         await state.clear()
         await message.answer(
@@ -652,11 +913,5 @@ async def start(message: Message, state: FSMContext):
     else:
         await message.answer(f"Что-то ещё?", reply_markup=keyboard.start_kb)
     await get_stats(message.chat.id)
+    await state.update_data(key=message.chat.id)
     await state.set_state(Main_menu.mode)
-
-#@router.message(F.text.lower() == "добавить слово")
-#async def stats(message: Message):
-#    await message.answer(
-#        "добавить слово.",
-#        reply_markup=keyboard.training_kb
-#    )
