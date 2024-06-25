@@ -41,3 +41,18 @@ stop_kb = ReplyKeyboardMarkup(
     one_time_keyboard=False,
     selective=True
 )
+
+task_13_kb = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="Слитно"),
+            KeyboardButton(text="Раздельно"),
+        ],
+        [
+            KeyboardButton(text="Стоп")
+        ]
+    ],
+    resize_keyboard=True,
+    one_time_keyboard=False,
+    selective=True
+)
