@@ -6,7 +6,7 @@ import string
 import sqlite3
 import math
 import keyboard
-from handlers import base
+from handlers import base, start
 import os
 
 
@@ -44,10 +44,11 @@ def diff_letters(a, b):
 
 
 async def main():
-    tg_token = os.environ["tg_token"]
+    tg_token = os.environ["tg_test_token"]
     bot = Bot(str(tg_token))
     dp = Dispatcher()
 
+    dp.include_routers(start.router)
     dp.include_routers(base.router)
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
