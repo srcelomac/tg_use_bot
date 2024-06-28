@@ -1,4 +1,4 @@
-from aiogram import Router, F
+from aiogram import Bot, Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
@@ -75,7 +75,7 @@ task_4 = [
     ['статуя', 'стАтуя'],
     ['столяр', 'столЯр'],
     ['таможня', 'тамОжня'],
-    ['торты', 'тОрт'],
+    ['торты', 'тОрты'],
     ['туфля', 'тУфля'],
     ['цемент', 'цемЕнт'],
     ['центнер', 'цЕнтнер'],
@@ -235,7 +235,7 @@ task_9 = [
         ['утв_рь', 'а'],
         ['приг_рь', 'а'],
         ['изг_рь', 'а'],
-        ['в_гарки', 'ы'],
+        ['выг_рки', 'а'],
         ['гар_вой', 'е'],
         ['р_сток', 'о'],
         ['р_сточек', 'о'],
@@ -253,9 +253,9 @@ task_9 = [
         ['Р_стов', 'о'],
         ['отр_сль', 'а'],
         ['отр_слевой', 'а'],
-        ['межотраслевой', 'а'],
+        ['межотр_слевой', 'а'],
         ['внутриотр_слевой', 'а'],
-        ['отрас_левик', 'а'],
+        ['отр_слевик', 'а'],
         ['ск_кать', 'а'],
         ['ск_чу', 'а'],
         ['ск_кал', 'а'],
@@ -485,6 +485,7 @@ async def del_training(chat_id):
     cur.close()
     conn.close()
 
+
 task_words = []
 
 @router.message(Base.exercise)
@@ -518,7 +519,7 @@ async def start_training(message: Message, state: FSMContext):
 
         else:
             await message.answer(
-                f'Укажи номер задания',
+                f'Укажи номер задания'
             )
     #print((await state.get_data())['flag_training'])
     if ((await state.get_data())['flag_training'] == True or step != 0):
@@ -541,7 +542,7 @@ async def start_training(message: Message, state: FSMContext):
 
                     markup = keyboard.start_kb
                     await message.answer(
-                        f'Ты сделал верно {int((await state.get_data())['answer_true'])} из {int((await state.get_data())['answer_true']) + int((await state.get_data())['answer_false'])} заданий. Что-то ещё?',
+                        f'Ты сделал верно {int((await state.get_data())["answer_true"])} из {int((await state.get_data())["answer_true"]) + int((await state.get_data())["answer_false"])} заданий. Что-то ещё?',
                         reply_markup=markup)
 
                     await state.update_data(answer_true=0)
@@ -590,7 +591,8 @@ async def start_training(message: Message, state: FSMContext):
                                     if (s2[-1] == ','):
                                         s2 = s2[:-1:]
                             task_words.append([s1, s2])
-                        task_words = task_words + tasks_new_common[int((await state.get_data())['task_id']) - 9]
+                        if (int((await state.get_data())['task_id']) <= 15):
+                            task_words = task_words + tasks_new_common[int((await state.get_data())['task_id']) - 9]
 
                     random.shuffle(task_words)
 
@@ -663,7 +665,7 @@ async def start_training(message: Message, state: FSMContext):
 
                     markup = keyboard.start_kb
                     await message.answer(
-                        f'Ты сделал верно {int((await state.get_data())['answer_true'])} из {int((await state.get_data())['answer_true']) + int((await state.get_data())['answer_false'])} заданий. Что-то ещё?',
+                        f'Ты сделал верно {int((await state.get_data())["answer_true"])} из {int((await state.get_data())["answer_true"]) + int((await state.get_data())["answer_false"])} заданий. Что-то ещё?',
                         reply_markup=markup)
 
                     await state.update_data(answer_true=0)
@@ -691,7 +693,7 @@ async def start_training(message: Message, state: FSMContext):
 
                         markup = keyboard.start_kb
                         await message.answer(
-                            f'Слова закончились. Ты молодец!\n Ты сделал верно {int((await state.get_data())['answer_true'])} из {int((await state.get_data())['answer_true']) + int((await state.get_data())['answer_false'])} заданий.',
+                            f'Слова закончились. Ты молодец!\n Ты сделал верно {int((await state.get_data())["answer_true"])} из {int((await state.get_data())["answer_true"]) + int((await state.get_data())["answer_false"])} заданий.',
                             reply_markup=markup)
 
                         await state.update_data(answer_true=0)
@@ -739,7 +741,7 @@ async def start_training(message: Message, state: FSMContext):
 
                         markup = keyboard.start_kb
                         await message.answer(
-                            f'Слова закончились. Ты молодец!\nТы сделал верно {int((await state.get_data())['answer_true'])} из {int((await state.get_data())['answer_true']) +int((await state.get_data())['answer_false'])} заданий.',
+                            f'Слова закончились. Ты молодец!\nТы сделал верно {int((await state.get_data())["answer_true"])} из {int((await state.get_data())["answer_true"]) +int((await state.get_data())["answer_false"])} заданий.',
                             reply_markup=markup)
 
                         await state.update_data(answer_true=0)
@@ -771,7 +773,7 @@ async def start_training(message: Message, state: FSMContext):
 
 
 @router.message(Base.add)
-async def start_training(message: Message, state: FSMContext):
+async def start_add(message: Message, state: FSMContext):
     data = await state.get_data()
     chat_id = int(data['key'])
     step = int(data['step'])
@@ -797,7 +799,7 @@ async def start_training(message: Message, state: FSMContext):
             #global word_was
             if (flag_add == False):
                 markup = keyboard.stop_kb
-                await message.answer( "На первой строке напиши слово с пропуском '_', на второй правильный ответ \nКогда решишь прекратить, выбери на клавиатуре или напиши слово Стоп", reply_markup=markup)
+                await message.answer("На первой строке напиши слово с пропуском '_', на второй правильный ответ \nКогда решишь прекратить, выбери на клавиатуре или напиши слово Стоп", reply_markup=markup)
                 await state.update_data(flag_add=True)
                 #flag_add = True   +
             else:
@@ -893,7 +895,6 @@ async def start_mode(message: Message, state: FSMContext):
 @router.message()
 async def start(message: Message, state: FSMContext):
     await state.clear()
-
     await state.update_data(task_id=0)
     #task_id = 0   +
 
