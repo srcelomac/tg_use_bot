@@ -591,7 +591,7 @@ async def start_training(message: Message, state: FSMContext):
                                     if (s2[-1] == ','):
                                         s2 = s2[:-1:]
                             task_words.append([s1, s2])
-                        if (int((await state.get_data())['task_id']) <= 15):
+                        if (int((await state.get_data())['task_id']) <= 16):
                             task_words = task_words + tasks_new_common[int((await state.get_data())['task_id']) - 9]
 
                     random.shuffle(task_words)
