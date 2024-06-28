@@ -623,6 +623,10 @@ async def start_training(message: Message, state: FSMContext):
                         if (int((await state.get_data())['task_id']) == 4):
                             await message.answer(
                                 "Напиши слово целиком, выделив заглавной буквой гласную, на которую падает ударение\nБанты -> <u>Б</u>Анты или <u>б</u>Анты", parse_mode=ParseMode.HTML)
+                        elif (int((await state.get_data())['task_id']) == 16):
+                            await message.answer(
+                                "Века писать римскими цифрами (XI), года - арабскими (11).",
+                                parse_mode=ParseMode.HTML)
                         elif (int((await state.get_data())['task_id']) == 15):
                             await message.answer(
                                 "В зависимости от ответа напиши 'н' или 'нн'\nИско_и -> <u>Н</u>н или <u>н</u>н",
