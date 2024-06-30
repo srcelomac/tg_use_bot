@@ -39,10 +39,6 @@ cur.close()
 conn.close()
 
 
-def diff_letters(a, b):
-    return sum(a[i] != b[i] for i in range(min(len(a), len(b))))
-
-
 async def main():
     tg_token = os.environ["tg_test_token"]
     bot = Bot(str(tg_token))
